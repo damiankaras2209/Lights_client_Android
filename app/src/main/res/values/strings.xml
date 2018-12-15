@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">Light</string>
+    <string name="shortcut_long_label">Light</string>
+    <string name="shortcut_short_label">Light</string>
+    <string name="shortcut_disabled_message">disabled</string>
 </resources>

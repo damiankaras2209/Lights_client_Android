@@ -1,14 +1,26 @@
 package me.kptmusztarda.lights;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+
+import me.kptmusztarda.handylib.Logger;
 
 
 public class MainActivity extends Activity {
@@ -18,17 +30,22 @@ public class MainActivity extends Activity {
 
     private final static String TAG = "MAIN";
 
+    private static final String permissions[] = {
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+    };
+
     private void checkPermissions() {
-        int permission1 = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
-        int permission2 = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        if(permission1 != 0 || permission2 != 0) ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO,Manifest.permission.WRITE_EXTERNAL_STORAGE}, 2137);
-
+        for(String p : permissions)
+            if(ContextCompat.checkSelfPermission(this, p) != 0) {
+                ActivityCompat.requestPermissions(this, permissions, 2137);
+                break;
+            }
     }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+    @Override public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_DENIED) android.os.Process.killProcess(android.os.Process.myPid());
     }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,7 +53,6 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         Logger.setDirectory("", "lights_log.txt");
-        Logger.enableLogging(true);
 
         checkPermissions();
 
@@ -49,57 +65,42 @@ public class MainActivity extends Activity {
         switchButtons[5] = findViewById(R.id.button_switch_6);
         Button switchAllButton = findViewById(R.id.button_switch_all);
 
-        net = new Network("192.168.0.131", 2137, (TextView)findViewById(R.id.status));
-        bulbs = new Bulbs(6);
+        net = Network.getInstance();
+        net.setContext(this);
+        net.setStatusTextView(findViewById(R.id.status));
+        Bulbs.setViews(this, switchButtons);
 
         for (int i = 0; i< switchButtons.length; i++) {
             final int x = i;
-            switchButtons[i].setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    net.send(bulbs.getSwitchOneString(x));
-                }
-            });
+            switchButtons[i].setOnClickListener(view -> net.send(Bulbs.getSwitchOneString(x)));
         }
 
-        switchAllButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                net.send(bulbs.getSwitchAllString());
-            }
-        });
+        switchAllButton.setOnClickListener(view -> net.send(Bulbs.getSwitchAllString()));
 
-        Thread listener = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                String str = "";
-                while (true) {
-                    str = net.getReceivedData();
-                    if (str.length() > 0) {
-                        bulbs.setStatus(str);
-                        net.clearReceivedData();
-                    }
-                    try {
-                        Thread.sleep(20);
-                    } catch (InterruptedException e) {
-                        Logger.log(TAG, e);
-                    }
-                }
-            }
-        });
-        listener.start();
+        Intent intent = new Intent(this, BixbyListener.class);
+        if(!BixbyListener.isRunning()) startForegroundService(intent);
 
     }
 
+    @Override
     public void onStart() {
-        Logger.space();
         Logger.log(TAG, "Starting app");
         net.connect();
+        net.setMakeToasts(false);
+        Bulbs.setUpdateUI(true);
+        Bulbs.updateUI();
+
+        Intent intent = new Intent(this, BixbyListener.class);
+        if(!BixbyListener.isRunning()) startForegroundService(intent);
+
         super.onStart();
     }
 
+    @Override
     public void onStop() {
         net.closeSocket();
+        net.setMakeToasts(true);
+        Bulbs.setUpdateUI(false);
         super.onStop();
     }
 
