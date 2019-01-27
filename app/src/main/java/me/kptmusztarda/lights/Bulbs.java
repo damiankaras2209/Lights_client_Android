@@ -14,7 +14,6 @@ class Bulbs {
     private static int status[] = new int[6];
     private static int WAIT = 75;
     private static Button buttonViews[];
-    private static Context context;
     private static boolean updateUI;
     private static final String TAG = "Bulbs";
 
@@ -34,17 +33,24 @@ class Bulbs {
     static void updateUI() {
         if(updateUI) {
             for(int i=0; i<status.length; i++) {
-                int j =i;
+                int j=i;
+                int color = 0;
+                Context context = App.get().getApplicationContext();
+                switch (status[j]) {
+                    case 0: color = context.getColor(R.color.colorOff); break;
+                    case 1: color = context.getColor(R.color.colorOn); break;
+                    case 2: color = context.getColor(R.color.colorBasic); break;
+                }
+                int finalColor = color;
                 Utilities.runOnUiThread(() -> {
-                    buttonViews[j].setBackgroundColor(status[j] == 1 ? context.getColor(R.color.colorOn) : context.getColor(R.color.colorOff));
+                    buttonViews[j].setBackgroundColor(finalColor);
                 });
             }
         }
     }
 
-    static void setViews(Context ctx, Button buttons[]) {
+    static void setViews(Button buttons[]) {
         buttonViews = buttons;
-        context = ctx;
     }
 
     static void setUpdateUI(boolean b) {
@@ -94,7 +100,7 @@ class Bulbs {
             StringWriter writer = new StringWriter();
             for (int i = 0; i < status.length; i += 2) {
                 writer.write(String.format("S%d%d", i, 1));
-                Logger.log(TAG, "i: " + i + " , status.length: " + status.length);
+                //Logger.log(TAG, "i: " + i + " , status.length: " + status.length);
                 if (i+2<status.length) writer.write(String.format(",W%d,", WAIT));
             }
             return writer.toString();

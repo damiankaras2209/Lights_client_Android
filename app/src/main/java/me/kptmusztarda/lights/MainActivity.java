@@ -1,7 +1,6 @@
 package me.kptmusztarda.lights;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -9,16 +8,7 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.util.Log;
-import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
 
 import me.kptmusztarda.handylib.Logger;
 
@@ -68,7 +58,7 @@ public class MainActivity extends Activity {
         net = Network.getInstance();
         net.setContext(this);
         net.setStatusTextView(findViewById(R.id.status));
-        Bulbs.setViews(this, switchButtons);
+        Bulbs.setViews(switchButtons);
 
         for (int i = 0; i< switchButtons.length; i++) {
             final int x = i;
@@ -77,21 +67,19 @@ public class MainActivity extends Activity {
 
         switchAllButton.setOnClickListener(view -> net.send(Bulbs.getSwitchAllString()));
 
-        Intent intent = new Intent(this, BixbyListener.class);
-        if(!BixbyListener.isRunning()) startForegroundService(intent);
-
     }
 
     @Override
     public void onStart() {
         Logger.log(TAG, "Starting app");
-        net.connect();
         net.setMakeToasts(false);
+        net.connect();
+        //net.updateUI();
         Bulbs.setUpdateUI(true);
         Bulbs.updateUI();
 
-        Intent intent = new Intent(this, BixbyListener.class);
-        if(!BixbyListener.isRunning()) startForegroundService(intent);
+        Intent intent = new Intent(this, BroadcastReceiverService.class);
+        if(!BroadcastReceiverService.isRunning()) startForegroundService(intent);
 
         super.onStart();
     }

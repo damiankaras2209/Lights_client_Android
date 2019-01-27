@@ -13,9 +13,34 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.util.logging.Handler;
 
 import me.kptmusztarda.handylib.Logger;
 import me.kptmusztarda.handylib.Utilities;
+
+enum Status {
+
+    IMPROPER_NETWORK("Improper network", Color.parseColor("#c62323")),
+    DISCONNECTED("Disconnected", Color.parseColor("#c62323")),
+    CONNECTING("Connecting...", Color.parseColor("#e8c61e")),
+    CONNECTED("Connected", Color.parseColor("#27c449"));
+
+    private String str;
+    private int color;
+
+    private Status(String str, int color) {
+        this.str = str;
+        this.color = color;
+    }
+
+    public String getString() {
+        return str;
+    }
+
+    public int getColor() {
+        return color;
+    }
+}
 
 public class Network {
 
@@ -25,12 +50,9 @@ public class Network {
     private int port = 2137;
 
     private static final int MAX_CONNECTION_ATTEMPTS = 60;
+    private static final int SERVER_ANSWER_LENGTH = 14;
 
-    private static final int DISCONNECTED = -1;
-    private static final int CONNECTING = 0;
-    private static final int CONNECTED = 1;
-
-    private int status;
+    private Status status = Status.DISCONNECTED;
 
     private Socket sock;
     private SocketAddress socketAddress;
@@ -38,8 +60,9 @@ public class Network {
 
     private final int timeout = 1; // delay between connecting attempts in seconds
     private int connectionAttempt = 0;
+    private long lastServerAnswer;
+
     private TextView statusTextView;
-    private long lastReceive = System.currentTimeMillis();
     private WifiManager wifiManager;
     private Context context;
     private boolean makeToasts;
@@ -48,7 +71,7 @@ public class Network {
 
     private Network() {
         socketAddress = new InetSocketAddress(ip, port);
-        setStatus(DISCONNECTED);
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> Logger.log(TAG, e));
     }
 
     static {
@@ -72,38 +95,43 @@ public class Network {
     }
 
     void connect() {
-        Logger.log(TAG, "connect() status: " + status + " properNetwork: " + Boolean.toString(isConnectedToProperWiFiNetwork()));
-        if(status == DISCONNECTED && isConnectedToProperWiFiNetwork()) {
-            allowReconnecting = true;
-            new Thread(() -> {
-                setStatus(CONNECTING);
-                //Logger.log(TAG, "Connect thread started");
-                while (status == CONNECTING && allowReconnecting && connectionAttempt <= MAX_CONNECTION_ATTEMPTS ) {
-                    try {
-                        connectionAttempt++;
-                        Logger.log(TAG, "Connecting... attempt: " + connectionAttempt);
-                        sock = new Socket();
-                        sock.connect(socketAddress, 1000);
-                        Logger.log(TAG, "Connected");
-                        setStatus(CONNECTED);
-                        listen();
-                    } catch (IOException e) {
-                        Logger.log(TAG, "Connetion failed (" + e.getMessage() + "). Retrying in " + timeout + " seconds");
+        Logger.log(TAG, "connect()");
+        if(!isConnectedOrConnecting()) {
+            isConnectedToProperWiFiNetwork();
+            if (status.equals(Status.DISCONNECTED)) {
+                new Thread(() -> {
+                    allowReconnecting = true;
+                    connectionAttempt = 0;
+                    setStatus(Status.CONNECTING);
+                    //Logger.log(TAG, "Connect thread started");
+                    while (status.equals(Status.CONNECTING) && allowReconnecting && connectionAttempt <= MAX_CONNECTION_ATTEMPTS) {
                         try {
-                            Thread.sleep(timeout * 1000);
-                        } catch (InterruptedException e1) {
-                            Logger.log(TAG, e1);
+                            connectionAttempt++;
+                            updateUI();
+                            Logger.log(TAG, "Connecting... attempt: " + connectionAttempt);
+                            sock = new Socket();
+                            sock.connect(socketAddress, 1000);
+                            Logger.log(TAG, "Connected");
+                            setStatus(Status.CONNECTED);
+                            listen();
+                        } catch (IOException e) {
+                            Logger.log(TAG, "Connetion failed (" + e.getMessage() + "). Retrying in " + timeout + " seconds");
+                            try {
+                                Thread.sleep(timeout * 1000);
+                            } catch (InterruptedException e1) {
+                                Logger.log(TAG, e1);
+                            }
                         }
                     }
-                }
-                //Logger.log(TAG, "Connect thread finished");
-            }).start();
+                    //Logger.log(TAG, "Connect thread finished");
+                }).start();
+            }
         }
     }
 
     synchronized void connectAndWait() {
         connect();
-        while(status != CONNECTED) {
+        while(!status.equals(Status.CONNECTED)) {
             try {
                 wait(10);
             } catch (InterruptedException e) {
@@ -115,7 +143,7 @@ public class Network {
     void send(final String dataOut, boolean closeAfterSend) {
         new Thread(() -> {
             try {
-                if(status == CONNECTED) {
+                if(status.equals(Status.CONNECTED)) {
                     OutputStreamWriter out = new OutputStreamWriter(sock.getOutputStream());
                     PrintWriter pw = new PrintWriter(out, true);
                     Logger.log(TAG, "Sending: '" + dataOut + "'");
@@ -123,6 +151,14 @@ public class Network {
                     pw.flush();
                     Logger.log(TAG, "CloseAfterSend: " + Boolean.toString(closeAfterSend));
                     if(closeAfterSend) closeSocket();
+                    else {
+                        try {
+                            Thread.sleep(100);
+                            if(System.currentTimeMillis() - lastServerAnswer > 100) closeSocket();
+                        } catch (InterruptedException e1) {
+                            Logger.log(TAG, e1);
+                        }
+                    }
                 } else {
                     Logger.log(TAG, "Sending failed. Not connected");
                     connectAndWait();
@@ -144,11 +180,12 @@ public class Network {
             try {
                 InputStreamReader in = new InputStreamReader(sock.getInputStream());
                 int n;
-                char cbuf[] = new char[20];
+                char cbuf[] = new char[SERVER_ANSWER_LENGTH];
                 while (true) {
                     n = in.read(cbuf, 0, cbuf.length);
                     if(n > 0) {
                         String receivedData = new String(cbuf).substring(0, n);
+                        lastServerAnswer = System.currentTimeMillis();
                         Logger.log(TAG, "Received: '" + receivedData + "'");
 
                         Bulbs.setStatus(receivedData.substring(0, receivedData.indexOf('/')));
@@ -160,15 +197,15 @@ public class Network {
                             Utilities.runOnUiThread(() -> Toast.makeText(context, "Lights are " + (Bulbs.isAtLeastOneOn() ? "on" : "off"), Toast.LENGTH_SHORT).show());
 
                     } else if(n == -1){
-                        setStatus(DISCONNECTED);
+                        setStatus(Status.DISCONNECTED);
                         Logger.log(TAG, "Disconnected");
-                        if(status != CONNECTING && allowReconnecting) {
+                        if(!status.equals(Status.CONNECTING) && allowReconnecting) {
                             Logger.log(TAG, "Reconnecting from listen loop");
                             connect();
                         }
                         throw new IOException("Connection closed");
                     }
-                    cbuf = new char[20];
+                    cbuf = new char[SERVER_ANSWER_LENGTH];
                 }
             } catch (IOException e) {
                 Logger.log(TAG, "Stopping listening loop (" + e.getMessage() + ")");
@@ -187,76 +224,64 @@ public class Network {
 //    }
 
     protected boolean isConnectedOrConnecting() {
-        return status == CONNECTING || status == CONNECTED;
-    }
-
-    private void setStatus(int status) {
-        this.status = status;
-        updateUI();
-        Logger.log(TAG, "New status: " + status);
+        return status.equals(Status.CONNECTING) || status.equals(Status.CONNECTED);
     }
 
     private boolean isConnectedToProperWiFiNetwork() {
-        String networks[] = {"dlink-74A1", "dlink-74A1-5GHz", "ASUS", "ASUS"};
+        String networks[] = {"dlink-74A1", "dlink-74A1-5GHz", "ASUS", "ASUS_5GHz"};
 
         WifiManager mWifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
         String connectedNetworkSSID = mWifiManager.getConnectionInfo().getSSID();
 
-        for(String network : networks) {
+        for(String network : networks)
             if(network.equals(connectedNetworkSSID.substring(1, connectedNetworkSSID.length() - 1))) {
+                setStatus(Status.DISCONNECTED);
                 return true;
             }
-        }
 
-        if(makeToasts) Toast.makeText(context, "Not connected to a proper Wi-Fi network", Toast.LENGTH_SHORT).show();
+        if(makeToasts) Utilities.runOnUiThread(() -> Toast.makeText(context, "Not connected to a proper Wi-Fi network", Toast.LENGTH_SHORT).show());
+        setStatus(Status.IMPROPER_NETWORK);
         return false;
     }
 
-    private void updateUI() {
+    private void setStatus(Status status) {
+        this.status = status;
+        if(!status.equals(Status.CONNECTED)) Bulbs.setStatus("021222324252");
+        Logger.log(TAG, "New status: " + status);
+        updateUI();
+    }
+
+    public void updateUI() {
         if(statusTextView != null) {
-            String statusString = "";
-            String statusColor = "#000";
-            switch (status) {
-                case -1:
-                    statusString = "Disconnected";
-                    statusColor = "#c62323";
-                    break;
-                case 0:
-                    statusString = "Connecting";
-                    statusColor = "#e8c61e";
-                    break;
-                case 1:
-                    statusString = "Connected";
-                    statusColor = "#27c449";
-                    break;
-            }
-            final String str = statusString;
-            final String col = statusColor;
+            //Logger.log(TAG, "updateUI()");
             Utilities.runOnUiThread(() -> {
-                statusTextView.setText(str);
-                statusTextView.setTextColor(Color.parseColor(col));
+                if(status.equals(Status.CONNECTING)) statusTextView.setText(status.getString() + " " + connectionAttempt);
+                else statusTextView.setText(status.getString());
+                statusTextView.setTextColor(status.getColor());
             });
         }
     }
 
     void closeSocket() {
-        if (status == CONNECTED) {
+        if (status.equals(Status.CONNECTED)) {
             Logger.log(TAG, "Closing socket");
-            setStatus(DISCONNECTED);
             allowReconnecting = false;
             if (sock != null) {
                 try {
                     sock.shutdownOutput();
                 } catch (IOException e) {
-                    Logger.log(TAG, e);
+                    //Logger.log(TAG, e);
                 }
                 try {
                     sock.close();
                 } catch (IOException e) {
-                    Logger.log(TAG, e);
+                    //Logger.log(TAG, e);
                 }
             }
+        } else if (status.equals(Status.CONNECTING)) {
+            allowReconnecting = false;
         }
+        isConnectedToProperWiFiNetwork();
     }
 
 }
