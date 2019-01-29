@@ -13,7 +13,6 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
-import java.util.logging.Handler;
 
 import me.kptmusztarda.handylib.Logger;
 import me.kptmusztarda.handylib.Utilities;
@@ -112,7 +111,7 @@ public class Network {
                             Logger.log(TAG, "Connecting... attempt: " + connectionAttempt);
                             sock = new Socket();
                             sock.connect(socketAddress, 1000);
-                            Logger.log(TAG, "Connected");
+//                            Logger.log(TAG, "Connected");
                             setStatus(Status.CONNECTED);
                             listen();
                         } catch (IOException e) {
@@ -130,9 +129,9 @@ public class Network {
         }
     }
 
-    synchronized void connectAndWait() {
+    synchronized void connectAndWaitForAnswer() {
         connect();
-        while(!status.equals(Status.CONNECTED)) {
+        while(!status.equals(Status.CONNECTED) && System.currentTimeMillis() - lastServerAnswer > 15) {
             try {
                 wait(10);
             } catch (InterruptedException e) {
@@ -161,7 +160,7 @@ public class Network {
 
                 } else {
                     Logger.log(TAG, "Sending failed. Not connected");
-                    connectAndWait();
+                    connectAndWaitForAnswer();
                     send(stringType, id, closeAfterSend);
                 }
             } catch (IOException e) {
@@ -193,7 +192,7 @@ public class Network {
                         boolean isEndOfQuery = Integer.parseInt(receivedData.substring(receivedData.length()-1, receivedData.length())) == 1 ? true : false;
                         //Logger.log(TAG, "showToast?: " + Boolean.toString(showToast));
 
-                        Logger.log(TAG, "makeToast?: " + Boolean.toString(makeToasts) + " isEndOfQuery?: " + isEndOfQuery);
+                        //Logger.log(TAG, "makeToast?: " + Boolean.toString(makeToasts) + " isEndOfQuery?: " + isEndOfQuery);
                         if(makeToasts && isEndOfQuery)
                             Utilities.runOnUiThread(() -> Toast.makeText(context, "Lights are " + (Bulbs.isAtLeastOneOn() ? "on" : "off"), Toast.LENGTH_SHORT).show());
 
