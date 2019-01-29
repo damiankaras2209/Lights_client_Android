@@ -47,6 +47,7 @@ public class Network {
     private final static String TAG = "NETWORK";
     private static Network instance;
     private String ip = "192.168.0.131";
+    private String networks[] = {"dlink-74A1", "dlink-74A1-5GHz", "ASUS", "ASUS_5GHz"};
     private int port = 2137;
 
     private static final int MAX_CONNECTION_ATTEMPTS = 60;
@@ -140,29 +141,28 @@ public class Network {
         }
     }
 
-    void send(final String dataOut, boolean closeAfterSend) {
+    void send(final int stringType, final int id, boolean closeAfterSend) {
         new Thread(() -> {
             try {
                 if(status.equals(Status.CONNECTED)) {
                     OutputStreamWriter out = new OutputStreamWriter(sock.getOutputStream());
                     PrintWriter pw = new PrintWriter(out, true);
-                    Logger.log(TAG, "Sending: '" + dataOut + "'");
-                    pw.print(dataOut);
+                    Logger.log(TAG, "Sending: '" + Bulbs.getString(stringType, id) + "'");
+                    pw.print(Bulbs.getString(stringType, id));
                     pw.flush();
                     Logger.log(TAG, "CloseAfterSend: " + Boolean.toString(closeAfterSend));
-                    if(closeAfterSend) closeSocket();
-                    else {
+
                         try {
-                            Thread.sleep(100);
-                            if(System.currentTimeMillis() - lastServerAnswer > 100) closeSocket();
+                            Thread.sleep(500);
+                            if(System.currentTimeMillis() - lastServerAnswer > 500 || (closeAfterSend && makeToasts == true)) closeSocket();
                         } catch (InterruptedException e1) {
                             Logger.log(TAG, e1);
                         }
-                    }
+
                 } else {
                     Logger.log(TAG, "Sending failed. Not connected");
                     connectAndWait();
-                    send(dataOut, closeAfterSend);
+                    send(stringType, id, closeAfterSend);
                 }
             } catch (IOException e) {
                 Logger.log(TAG, e);
@@ -170,8 +170,8 @@ public class Network {
         }).start();
     }
 
-    void send(final String dataOut) {
-        send(dataOut, false);
+    void send(final int stringType, final int id) {
+        send(stringType, id, false);
     }
 
 
@@ -193,6 +193,7 @@ public class Network {
                         boolean isEndOfQuery = Integer.parseInt(receivedData.substring(receivedData.length()-1, receivedData.length())) == 1 ? true : false;
                         //Logger.log(TAG, "showToast?: " + Boolean.toString(showToast));
 
+                        Logger.log(TAG, "makeToast?: " + Boolean.toString(makeToasts) + " isEndOfQuery?: " + isEndOfQuery);
                         if(makeToasts && isEndOfQuery)
                             Utilities.runOnUiThread(() -> Toast.makeText(context, "Lights are " + (Bulbs.isAtLeastOneOn() ? "on" : "off"), Toast.LENGTH_SHORT).show());
 
@@ -228,8 +229,6 @@ public class Network {
     }
 
     private boolean isConnectedToProperWiFiNetwork() {
-        String networks[] = {"dlink-74A1", "dlink-74A1-5GHz", "ASUS", "ASUS_5GHz"};
-
         WifiManager mWifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
         String connectedNetworkSSID = mWifiManager.getConnectionInfo().getSSID();
 
@@ -245,10 +244,12 @@ public class Network {
     }
 
     private void setStatus(Status status) {
-        this.status = status;
-        if(!status.equals(Status.CONNECTED)) Bulbs.setStatus("021222324252");
-        Logger.log(TAG, "New status: " + status);
-        updateUI();
+        if(this.status != status) {
+            this.status = status;
+            if (!status.equals(Status.CONNECTED)) Bulbs.setStatus("021222324252");
+            Logger.log(TAG, "New status: " + status);
+            updateUI();
+        }
     }
 
     public void updateUI() {

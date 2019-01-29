@@ -55,7 +55,7 @@ public class BroadcastReceiverService extends Service {
 
     void action() {
         Logger.log(TAG, "Action!");
-        net.send(Bulbs.getBixbyString(), false);
+        net.send(Bulbs.STRING_SWITCH_HALF, 0, true);
     }
 
     @Override

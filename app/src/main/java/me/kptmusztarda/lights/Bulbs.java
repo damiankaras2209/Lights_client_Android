@@ -2,15 +2,20 @@ package me.kptmusztarda.lights;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.support.annotation.Nullable;
 import android.widget.Button;
 
 import java.io.StringWriter;
 
-import me.kptmusztarda.handylib.Logger;
 import me.kptmusztarda.handylib.Utilities;
 
 class Bulbs {
 
+    static final int STRING_SWITCH_ONE = 1;
+    static final int STRING_SWITCH_ALL = 2;
+    static final int STRING_SWITCH_HALF = 3;
+    static final int STRING_SWITCH_ALL_OFF = 4;
+    static final int STRING_SWITCH_ALL_ON = 5;
     private static int status[] = new int[6];
     private static int WAIT = 75;
     private static Button buttonViews[];
@@ -57,8 +62,19 @@ class Bulbs {
         updateUI = b;
     }
 
+    static String getString(int type, int id) {
+        switch (type) {
+            case STRING_SWITCH_ONE: return getSwitchOneString(id);
+            case STRING_SWITCH_ALL: return getSwitchAllString();
+            case STRING_SWITCH_HALF: return getBixbyString();
+            case STRING_SWITCH_ALL_ON: return getSwitchAllString(true);
+            case STRING_SWITCH_ALL_OFF: return getSwitchAllString(false);
+            default: return null;
+        }
+    }
+
     @SuppressLint("DefaultLocale")
-    static String getSwitchOneString(int ind) {
+    private static String getSwitchOneString(int ind) {
         return String.format("S%d%d", ind, Math.abs(status[ind] - 1));
     }
 
@@ -75,7 +91,7 @@ class Bulbs {
     }
 
     @SuppressLint("DefaultLocale")
-    static String getSwitchAllString() {
+    private static String getSwitchAllString() {
         boolean at_least_one_on = true;
         for (int stat : status) {
             if (stat == 0) at_least_one_on = false;
@@ -92,7 +108,7 @@ class Bulbs {
     }
 
     @SuppressLint("DefaultLocale")
-    static String getBixbyString() {
+    private static String getBixbyString() {
 
         if(isAtLeastOneOn()) {
             return getSwitchAllString(false);

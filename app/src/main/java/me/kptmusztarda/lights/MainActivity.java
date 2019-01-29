@@ -62,10 +62,10 @@ public class MainActivity extends Activity {
 
         for (int i = 0; i< switchButtons.length; i++) {
             final int x = i;
-            switchButtons[i].setOnClickListener(view -> net.send(Bulbs.getSwitchOneString(x)));
+            switchButtons[i].setOnClickListener(view -> net.send(Bulbs.STRING_SWITCH_ONE, x));
         }
 
-        switchAllButton.setOnClickListener(view -> net.send(Bulbs.getSwitchAllString()));
+        switchAllButton.setOnClickListener(view -> net.send(Bulbs.STRING_SWITCH_ALL, 0));
 
     }
 
