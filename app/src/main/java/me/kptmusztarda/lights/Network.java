@@ -60,7 +60,7 @@ public class Network {
 
     private final int timeout = 1; // delay between connecting attempts in seconds
     private int connectionAttempt = 0;
-    private long lastServerAnswer;
+    volatile private long lastServerAnswer;
 
     private TextView statusTextView;
     private WifiManager wifiManager;
@@ -115,7 +115,7 @@ public class Network {
                             setStatus(Status.CONNECTED);
                             listen();
                         } catch (IOException e) {
-                            Logger.log(TAG, "Connetion failed (" + e.getMessage() + "). Retrying in " + timeout + " seconds");
+                            Logger.log(TAG, "Connection failed (" + e.getMessage() + "). Retrying in " + timeout + " seconds");
                             try {
                                 Thread.sleep(timeout * 1000);
                             } catch (InterruptedException e1) {
@@ -137,6 +137,7 @@ public class Network {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+            Logger.log(TAG, String.valueOf(System.currentTimeMillis() - lastServerAnswer));
         }
     }
 
@@ -184,7 +185,6 @@ public class Network {
                     n = in.read(cbuf, 0, cbuf.length);
                     if(n > 0) {
                         String receivedData = new String(cbuf).substring(0, n);
-                        lastServerAnswer = System.currentTimeMillis();
                         Logger.log(TAG, "Received: '" + receivedData + "'");
 
                         Bulbs.setStatus(receivedData.substring(0, receivedData.indexOf('/')));
@@ -195,6 +195,8 @@ public class Network {
                         //Logger.log(TAG, "makeToast?: " + Boolean.toString(makeToasts) + " isEndOfQuery?: " + isEndOfQuery);
                         if(makeToasts && isEndOfQuery)
                             Utilities.runOnUiThread(() -> Toast.makeText(context, "Lights are " + (Bulbs.isAtLeastOneOn() ? "on" : "off"), Toast.LENGTH_SHORT).show());
+
+                        lastServerAnswer = System.currentTimeMillis();
 
                     } else if(n == -1){
                         setStatus(Status.DISCONNECTED);
