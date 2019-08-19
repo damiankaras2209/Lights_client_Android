@@ -11,23 +11,47 @@ import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.IBinder;
-import android.support.annotation.Nullable;
-import android.support.v4.app.NotificationCompat;
+import android.widget.Toast;
+
+import com.android.volley.Request;
+import com.android.volley.toolbox.StringRequest;
+
+import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
 
 import me.kptmusztarda.handylib.Logger;
+import me.kptmusztarda.handylib.Utilities;
 
 public class BroadcastReceiverService extends Service {
 
-    private static final String ACTION = "me.kptmusztarda.lights.CLICK";
+
     private final String TAG = "BroadcastReceiverService";
+
+    private static final String ACTION_CLICK = "me.kptmusztarda.lights.CLICK";
+    private static final String ACTION_DOUBLE_CLICK = "me.kptmusztarda.lights.DOUBLE_CLICK";
+    private static final String ACTION_HOLD = "me.kptmusztarda.lights.HOLD";
+    private static final String ACTION_ACTION_DOUBLE_CLICK_HOLD = "me.kptmusztarda.lights.DOUBLE_CLICK_HOLD";
     private static boolean isRunning;
-    private Network net;
 
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Logger.log(TAG, "Broadcast received!");
-            action();
+            Logger.log(TAG, "Broadcast received! " + intent.getAction());
+            switch (intent.getAction()) {
+                case ACTION_CLICK:
+
+                    break;
+                case ACTION_DOUBLE_CLICK:
+                    action();
+                    break;
+
+                case ACTION_HOLD:
+
+                    break;
+                case ACTION_ACTION_DOUBLE_CLICK_HOLD:
+
+                    break;
+            }
         }
     };
 
@@ -43,10 +67,10 @@ public class BroadcastReceiverService extends Service {
         Logger.log(TAG, "onStartCommand");
         isRunning = true;
 
-        net = Network.getInstance();
-        net.setContext(this);
-
-        registerReceiver(broadcastReceiver, new IntentFilter(ACTION));
+        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_CLICK));
+        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_DOUBLE_CLICK));
+        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_HOLD));
+        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_ACTION_DOUBLE_CLICK_HOLD));
 
         startForeground();
 
@@ -55,7 +79,14 @@ public class BroadcastReceiverService extends Service {
 
     void action() {
         Logger.log(TAG, "Action!");
-        net.send(Bulbs.STRING_SWITCH_HALF, 0, true);
+        RequestQueue.add(new StringRequest(Request.Method.GET,
+                "http://192.168.0.131:2138/webapp/switch?id=all&state=toggle",
+                response -> {
+                    Bulbs.setStatus(response);
+                    Utilities.runOnUiThread(() -> Toast.makeText(App.get().getApplicationContext(), "Lights are " + (Bulbs.isAtLeastOneOn() ? "on" : "off"), Toast.LENGTH_SHORT).show());
+                },
+                error -> Logger.log(TAG, "Nie dziorgo: " + error)
+        ));
     }
 
     @Override
@@ -63,7 +94,6 @@ public class BroadcastReceiverService extends Service {
         super.onDestroy();
         Logger.log(TAG, "onDestroy");
         unregisterReceiver(broadcastReceiver);
-//        net.closeSocket();
         isRunning = false;
     }
 

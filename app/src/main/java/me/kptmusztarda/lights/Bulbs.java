@@ -1,33 +1,27 @@
 package me.kptmusztarda.lights;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.support.annotation.Nullable;
+import android.drm.DrmStore;
 import android.widget.Button;
+import android.widget.TextView;
 
-import java.io.StringWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 import me.kptmusztarda.handylib.Utilities;
 
 class Bulbs {
 
-    static final int STRING_SWITCH_ONE = 1;
-    static final int STRING_SWITCH_ALL = 2;
-    static final int STRING_SWITCH_HALF = 3;
-    static final int STRING_SWITCH_ALL_OFF = 4;
-    static final int STRING_SWITCH_ALL_ON = 5;
+    private static final String TAG = "Bulbs";
+
     private static int status[] = new int[6];
     private static int WAIT = 75;
     private static Button buttonViews[];
+    private static TextView statusView;
     private static boolean updateUI;
-    private static final String TAG = "Bulbs";
-
-//    Bulbs(int bulbsCount) {
-//        status = new int[bulbsCount];
-//    }
 
     static void setStatus(String str) {
-        //Logger.log(TAG, "Sent to setStatus(): '" + str + "'");
         for(int i=0; i<status.length; i++) {
             final int stat = Integer.parseInt(Character.toString(str.charAt(i*2+1)));
             status[i] = stat;
@@ -51,82 +45,25 @@ class Bulbs {
                     buttonViews[j].setBackgroundColor(finalColor);
                 });
             }
+            Utilities.runOnUiThread(() -> {
+                statusView.setText(new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(new Date()));
+            });
         }
     }
 
-    static void setViews(Button buttons[]) {
+    static void setViews(Button buttons[], TextView tv) {
         buttonViews = buttons;
+        statusView = tv;
     }
 
     static void setUpdateUI(boolean b) {
         updateUI = b;
     }
 
-    static String getString(int type, int id) {
-        switch (type) {
-            case STRING_SWITCH_ONE: return getSwitchOneString(id);
-            case STRING_SWITCH_ALL: return getSwitchAllString();
-            case STRING_SWITCH_HALF: return getBixbyString();
-            case STRING_SWITCH_ALL_ON: return getSwitchAllString(true);
-            case STRING_SWITCH_ALL_OFF: return getSwitchAllString(false);
-            default: return null;
-        }
-    }
-
-    @SuppressLint("DefaultLocale")
-    private static String getSwitchOneString(int ind) {
-        return String.format("S%d%d", ind, Math.abs(status[ind] - 1));
-    }
-
-    @SuppressLint("DefaultLocale")
-    private static String getSwitchAllString(boolean b) {
-        StringWriter writer = new StringWriter();
-        int val = b ? 1 : 0;
-        for(int i=0; i<status.length; i++) {
-            writer.write(String.format("S%d%d", i, val));
-            if(i < status.length - 1) writer.write(String.format(",W%d,", WAIT));
-        }
-
-        return writer.toString();
-    }
-
-    @SuppressLint("DefaultLocale")
-    private static String getSwitchAllString() {
-        boolean at_least_one_on = true;
-        for (int stat : status) {
-            if (stat == 0) at_least_one_on = false;
-        }
-        int val = at_least_one_on ? 0 : 1;
-
-        StringWriter writer = new StringWriter();
-        for(int i=0; i<status.length; i++) {
-            writer.write(String.format("S%d%d", i, val));
-            if(i < status.length - 1) writer.write(String.format(",W%d,", WAIT));
-        }
-
-        return writer.toString();
-    }
-
-    @SuppressLint("DefaultLocale")
-    private static String getBixbyString() {
-
-        if(isAtLeastOneOn()) {
-            return getSwitchAllString(false);
-        } else {
-            StringWriter writer = new StringWriter();
-            for (int i = 0; i < status.length; i += 2) {
-                writer.write(String.format("S%d%d", i, 1));
-                //Logger.log(TAG, "i: " + i + " , status.length: " + status.length);
-                if (i+2<status.length) writer.write(String.format(",W%d,", WAIT));
-            }
-            return writer.toString();
-        }
-    }
 
     static boolean isAtLeastOneOn() {
         boolean at_least_one_on = false;
         for (int stat : status) {
-//            Logger.log(TAG, "Status: " + stat);
             if (stat == 1) at_least_one_on = true;
         }
         return at_least_one_on;
