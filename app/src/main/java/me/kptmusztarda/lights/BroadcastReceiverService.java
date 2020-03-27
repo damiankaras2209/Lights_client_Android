@@ -27,10 +27,14 @@ public class BroadcastReceiverService extends Service {
 
     private final String TAG = "BroadcastReceiverService";
 
-    private static final String ACTION_CLICK = "me.kptmusztarda.lights.CLICK";
-    private static final String ACTION_DOUBLE_CLICK = "me.kptmusztarda.lights.DOUBLE_CLICK";
-    private static final String ACTION_HOLD = "me.kptmusztarda.lights.HOLD";
-    private static final String ACTION_ACTION_DOUBLE_CLICK_HOLD = "me.kptmusztarda.lights.DOUBLE_CLICK_HOLD";
+//    private static final String ACTION_CLICK = "me.kptmusztarda.lights.CLICK";
+//    private static final String ACTION_DOUBLE_CLICK = "me.kptmusztarda.lights.DOUBLE_CLICK";
+//    private static final String ACTION_HOLD = "me.kptmusztarda.lights.HOLD";
+//    private static final String ACTION_DOUBLE_CLICK_HOLD = "me.kptmusztarda.lights.DOUBLE_CLICK_HOLD";
+    private static final String ACTION_LIGHTS_OFF = "me.kptmusztarda.lights.LIGHTS_OFF";
+    private static final String ACTION_LIGHTS_ON = "me.kptmusztarda.lights.LIGHTS_ON";
+    private static final String ACTION_LIGHTS_HALF_ON = "me.kptmusztarda.lights.LIGHTS_HALF_ON";
+    private static final String ACTION_LIGHTS_TOGGLE = "me.kptmusztarda.lights.LIGHTS_TOGGLE";
     private static boolean isRunning;
 
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
@@ -38,19 +42,31 @@ public class BroadcastReceiverService extends Service {
         public void onReceive(Context context, Intent intent) {
             Logger.log(TAG, "Broadcast received! " + intent.getAction());
             switch (intent.getAction()) {
-                case ACTION_CLICK:
-
+//                case ACTION_CLICK:
+//
+//                    break;
+//                case ACTION_DOUBLE_CLICK:
+//                    action();
+//                    break;
+//
+//                case ACTION_HOLD:
+//
+//                    break;
+//                case ACTION_DOUBLE_CLICK_HOLD:
+//
+//                    break;
+                case ACTION_LIGHTS_OFF:
+                    action("http://192.168.0.131:2138/webapp/switch?id=query&state=S,0,false;W,100;S,1,false;W,100;S,2,false;W,100;S,3,false;W,100;S,4,false;W,100;S,5,false");
                     break;
-                case ACTION_DOUBLE_CLICK:
-                    action();
+                case ACTION_LIGHTS_ON:
+                    action("http://192.168.0.131:2138/webapp/switch?id=query&state=S,0,true;W,100;S,1,true;W,100;S,2,true;W,100;S,3,true;W,100;S,4,true;W,100;S,5,true;");
                     break;
-
-                case ACTION_HOLD:
-
+                case ACTION_LIGHTS_HALF_ON:
+                    action("http://192.168.0.131:2138/webapp/switch?id=query&state=S,0,true;W,100;S,1,false;W,100;S,2,true;W,100;S,3,false;W,100;S,4,true;W,100;S,5,false;");
                     break;
-                case ACTION_ACTION_DOUBLE_CLICK_HOLD:
-
-                    break;
+                case ACTION_LIGHTS_TOGGLE:
+                    action("http://192.168.0.131:2138/webapp/switch?id=all&state=toggle");
+                break;
             }
         }
     };
@@ -67,20 +83,24 @@ public class BroadcastReceiverService extends Service {
         Logger.log(TAG, "onStartCommand");
         isRunning = true;
 
-        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_CLICK));
-        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_DOUBLE_CLICK));
-        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_HOLD));
-        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_ACTION_DOUBLE_CLICK_HOLD));
+//        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_CLICK));
+//        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_DOUBLE_CLICK));
+//        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_HOLD));
+//        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_DOUBLE_CLICK_HOLD));
+        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_LIGHTS_OFF));
+        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_LIGHTS_ON));
+        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_LIGHTS_HALF_ON));
+        registerReceiver(broadcastReceiver, new IntentFilter(ACTION_LIGHTS_TOGGLE));
 
         startForeground();
 
         return super.onStartCommand(intent, flags, startId);
     }
 
-    void action() {
+    void action(String request) {
         Logger.log(TAG, "Action!");
         RequestQueue.add(new StringRequest(Request.Method.GET,
-                "http://192.168.0.131:2138/webapp/switch?id=all&state=toggle",
+                request,
                 response -> {
                     Bulbs.setStatus(response);
                     Utilities.runOnUiThread(() -> Toast.makeText(App.get().getApplicationContext(), "Lights are " + (Bulbs.isAtLeastOneOn() ? "on" : "off"), Toast.LENGTH_SHORT).show());
