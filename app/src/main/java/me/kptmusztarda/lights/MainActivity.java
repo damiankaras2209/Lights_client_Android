@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Logger.setDirectory("", "lights_log.txt");
+//        Logger.setDirectory("", "lights_log.txt");
 
         checkPermissions();
 
